@@ -1,0 +1,171 @@
+
+<!-- 将此文件上传至cdn,  可作为API接口 -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0,user-scalable=no,minimal-ui">
+    <title></title>
+    <style>
+        html,
+        body,
+        #app,
+        iframe {
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        #app {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">加载中, 请稍后...</div>
+    <script>
+        const rmkeys = ['data'];
+        const query = new URLSearchParams(Object.fromEntries(
+            Object.entries(getQuery()).filter(([key]) => !rmkeys.includes(key))
+        )).toString();
+        const app = document.querySelector('#app');
+        const API = `https://k.muzhix.cn/`;
+        const hasJumpOut = (new URLSearchParams(window.location.search)).has('jumpOut');
+        const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+        const isQQ = /QQ/i.test(navigator.userAgent);
+        const showdom = createElement('showdom', {
+            style: {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(0,0,0,.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }
+        });
+
+        fetch(`${API}rpa.php?data=${getQuery('data')}`).then(res => res.json()).then(res => {
+            if (res.code !== 200) {
+                app.innerText = '加载失败, 请刷新重试或联系客服';
+                return;
+            }
+            const src = `${res.data}?${query}`;
+            if (hasJumpOut && !isWeChat && !isQQ) {
+                top.location.href = src;
+                window.top.location.href = src;
+                return;
+            }
+            const iframe = createElement('iframe', {
+                src: src,
+                sandbox: `allow-same-origin allow-scripts allow-top-navigation allow-forms allow-popups allow-downloads allow-modals`
+            });
+            app.innerHTML = iframe.outerHTML;
+
+
+            // 监听传过来的dom
+            window.addEventListener('message', e => {
+                switch (e.data.action) {
+                    case 'showDom':
+                        showdom.innerHTML = e.data.dom;
+                        document.body.appendChild(showdom);
+                        break;
+                    case 'closeDom':
+                        showdom.remove();
+                        break;
+                    case 'custom':
+                        const iframeWindow = iframe.contentWindow;
+                        if (iframeWindow && iframeWindow[e.data.fun] === 'function') {
+                            iframeWindow[e.data.fun](window);
+                        } else {
+                            console.warn(iframeWindow);
+                        }
+                        break;
+                }
+            }, '*');
+
+            getTitle(src);
+        });
+
+        /**
+         * 获取URL查询参数，支持重复参数
+         * @param {string} key - 要获取的参数键名，不传则返回所有参数
+         * @returns {string|Object|Array} - 如果指定了key且参数重复，则返回一个数组；否则与版本1相同
+         */
+        function getQuery(key = null) {
+            const urlParams = new URLSearchParams(window.location.search);
+
+            if (key) {
+                return urlParams.getAll(key) || '';
+            } else {
+                const params = {};
+                for (const [key, value] of urlParams.entries()) {
+                    if (params[key]) {
+                        if (!Array.isArray(params[key])) {
+                            params[key] = [params[key]];
+                        }
+                        params[key].push(value);
+                    } else {
+                        params[key] = value;
+                    }
+                }
+                return params;
+            }
+        }
+
+        /**
+         * @description: 创建一个元素
+         * @param {string} tagName
+         * @param {object} attr
+         * @return {HTMLElement}
+         */
+        function createElement(tagName, attr = {}) {
+            if (!tagName) {
+                throw new Error("[tagName] 不能为空");
+            }
+            const tag = document.createElement(tagName);
+
+            function _setAttr(tag, attr) {
+                for (let k in attr) {
+                    if (typeof attr[k] === "object" && !Array.isArray(attr[k])) {
+                        _setAttr(tag[k], attr[k]);
+                    } else if (k in tag) {
+                        tag[k] = attr[k];
+                    } else if (typeof attr[k] === "function") {
+                        tag.setAttribute(k, attr[k]());
+                    } else {
+                        tag.setAttribute(k, attr[k]);
+                    }
+                }
+            }
+
+            _setAttr(tag, attr);
+            return tag;
+        }
+
+        /**
+         * @description: 获取目标网站的标题
+         * @param {string} url
+         * @return {void}
+         */
+function getTitle(url) {
+    const urlParams = new URLSearchParams(url.split('?')[1]);
+    const title = urlParams.get('title');
+    if (title) {
+        document.title = title;
+    } else {
+        document.title = '';
+    }
+}
+    </script>
+</body>
+
+</html>
